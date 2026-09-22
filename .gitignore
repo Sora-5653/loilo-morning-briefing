@@ -1,0 +1,16 @@
+.loilo-data/
+.env
+.env.*
+*.har
+auth-token*
+session-cookie*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv-classroom/
+*.egg-info/
+credentials.json
+client_secret*.json
+token.json
+node_modules/
+CLASSROOM_HANDOFF.md
