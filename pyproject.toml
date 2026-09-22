@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loilo-morning-briefing"
+version = "0.1.0"
+description = "Read-only, non-UI LoiLoNote collector for the weekday morning briefing"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+classroom = ["google-api-python-client>=2,<3", "google-auth-oauthlib>=1,<2", "keyring>=25,<26"]
+
+[project.scripts]
+loilo-briefing = "loilo_briefing.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["loilo_briefing*"]
