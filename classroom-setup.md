@@ -65,6 +65,6 @@ $classroomCollectorExit = $LASTEXITCODE
 & '.\.venv-classroom\Scripts\python.exe' -X utf8 -m unittest discover -s tests -q
 ```
 
-差分、提出状態だけの更新、締切変更、ページ送り、部分失敗後の回復、全体失敗時の保護、UTC日時、公式SDKのGET要求と本人限定フィルターを検証します。2026-09-13時点で実アカウントの取得は初回OAuth認証待ちです。
+差分、提出状態だけの更新、締切変更、ページ送り、部分失敗後の回復、全体失敗時の保護、UTC日時、公式SDKのGET要求と本人限定フィルターを検証します。2026-09-29に実アカウントでOAuth認証と収集（授業5件、全構成要素success）を確認しました。Googleは`classroom.coursework.me.readonly`の許可を旧名`classroom.student-submissions.me.readonly`で返すため、認証時の判定では別名として扱い、トークン更新時の同じ理由のライブラリ警告は出力しません。
 
 API仕様: [課題一覧](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork/list)、[本人の提出状態](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWork.studentSubmissions/list)、[お知らせ](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.announcements/list)、[教材](https://developers.google.com/workspace/classroom/reference/rest/v1/courses.courseWorkMaterials/list)。

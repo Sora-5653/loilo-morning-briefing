@@ -252,6 +252,16 @@ class AuthorizeTests(unittest.TestCase):
             authorize(self.path)
         vault.return_value.set_password.assert_called_once()
 
+    def test_alias_only_refresh_warning_is_silenced(self):
+        import logging
+        logger = logging.getLogger("google.oauth2.credentials")
+        prefix = "Not all requested scopes were granted by the authorization server, missing scopes "
+        with self.assertLogs(logger, "WARNING") as logs:
+            logger.warning(prefix + "https://www.googleapis.com/auth/classroom.coursework.me.readonly.")
+            logger.warning(prefix + "https://www.googleapis.com/auth/classroom.announcements.readonly.")
+        self.assertEqual(1, len(logs.records))
+        self.assertIn("announcements", logs.records[0].getMessage())
+
     def test_extra_granted_scopes_are_accepted_and_scope_check_is_restored(self):
         import os
         from loilo_briefing.classroom.auth import authorize

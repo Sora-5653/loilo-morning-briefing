@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from pathlib import Path
@@ -18,7 +19,21 @@ SCOPE_ALIASES = {
     "https://www.googleapis.com/auth/classroom.coursework.me.readonly":
         "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly",
 }
-VAULT_SERVICE ="Codex:DailyBrief:GoogleClassroom"
+
+
+class _AliasScopeFilter(logging.Filter):
+    """Drop google-auth's refresh warning when the only "missing" scopes were granted under an alias."""
+
+    def filter(self, record):
+        message = record.getMessage()
+        if not message.startswith("Not all requested scopes were granted"):
+            return True
+        missing = [scope for scope in SCOPES if scope in message]
+        return not missing or not all(scope in SCOPE_ALIASES for scope in missing)
+
+
+logging.getLogger("google.oauth2.credentials").addFilter(_AliasScopeFilter())
+VAULT_SERVICE = "Codex:DailyBrief:GoogleClassroom"
 VAULT_USER = "oauth"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
