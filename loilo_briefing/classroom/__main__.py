@@ -43,6 +43,7 @@ def main(argv=None):
         report = {"source": "classroom", "status": status, "error": type(error).__name__, "cache_preserved": cache.path.exists()}
         if error.reason:
             report["reason"] = error.reason
+        report.update(error.details)
         _print(report)
         return 2 if isinstance(error, (AuthenticationRequired, SetupRequired)) else 1
 

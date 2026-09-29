@@ -5,9 +5,11 @@ class ClassroomError(Exception):
     the user what to fix without exposing tokens, responses, or file paths.
     """
 
-    def __init__(self, message="", *, reason=None):
+    def __init__(self, message="", *, reason=None, details=None):
         super().__init__(message)
         self.reason = reason
+        # Only public, non-secret values (e.g. OAuth scope names).
+        self.details = details or {}
 
 
 class AuthenticationRequired(ClassroomError):

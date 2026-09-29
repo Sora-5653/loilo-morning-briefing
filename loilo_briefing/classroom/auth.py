@@ -58,6 +58,11 @@ def authorize(client_path: Path) -> None:
     except ImportError as exc:
         raise SetupRequired("Classroom dependencies are not installed") from exc
     config = _client_config(client_path)
+    # oauthlib otherwise raises a bare Warning whenever the granted scope set
+    # differs from the request in either direction, including when Google
+    # returns extra scopes. Check "required ⊆ granted" ourselves instead.
+    relax = os.environ.get("OAUTHLIB_RELAX_TOKEN_SCOPE")
+    os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
     try:
         flow = InstalledAppFlow.from_client_config(config, SCOPES, autogenerate_code_verifier=True)
         credentials = flow.run_local_server(
@@ -67,15 +72,22 @@ def authorize(client_path: Path) -> None:
             access_type="offline", prompt="consent",
         )
     except Exception as exc:
-        # oauthlib raises a bare Warning when a checkbox was cleared on
-        # Google's granular consent screen ("Scope has changed").
-        reason = ("consent_denied" if type(exc).__name__ == "AccessDeniedError"
-                  else "scopes_not_granted" if type(exc) is Warning
-                  else "authorization_incomplete")
+        reason = "consent_denied" if type(exc).__name__ == "AccessDeniedError" else "authorization_incomplete"
         raise AuthenticationRequired("Classroom authorization did not complete", reason=reason) from exc
+    finally:
+        if relax is None:
+            os.environ.pop("OAUTHLIB_RELAX_TOKEN_SCOPE", None)
+        else:
+            os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = relax
     granted = credentials.granted_scopes or credentials.scopes or []
-    if not set(SCOPES).issubset(granted):
-        raise AuthenticationRequired("Classroom read permissions were not granted", reason="scopes_not_granted")
+    if isinstance(granted, str):
+        granted = granted.split()
+    missing = set(SCOPES) - set(granted)
+    if missing:
+        # Scope names are public identifiers, safe to show for diagnosis.
+        raise AuthenticationRequired("Classroom read permissions were not granted", reason="scopes_not_granted",
+                                     details={"missing_scopes": _short(missing),
+                                              "extra_scopes": _short(set(granted) - set(SCOPES))})
     if not credentials.refresh_token:
         raise AuthenticationRequired("Classroom refresh token was not issued", reason="refresh_token_missing")
     try:
@@ -95,6 +107,10 @@ def authorize(client_path: Path) -> None:
         raise
     except Exception as exc:
         raise AuthenticationRequired("Classroom credentials could not be stored", reason="vault_write_failed") from exc
+
+
+def _short(scopes):
+    return sorted(scope.removeprefix("https://www.googleapis.com/auth/") for scope in scopes)
 
 
 def _client_config(client_path: Path) -> dict:

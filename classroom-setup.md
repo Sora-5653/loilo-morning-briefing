@@ -33,7 +33,7 @@ Google Classroom公式APIから、本人が生徒として参加している開�
 | `client_not_desktop` | 「ウェブ アプリケーション」などのクライアントです。種類「デスクトップ アプリ」で作り直します。 |
 | `client_endpoint_unexpected` | Google以外の認証先が書かれています。Google Cloudから取得し直します。 |
 | `consent_denied` | 同意画面で拒否されたか、テストユーザー未登録・学校のアプリ制限で拒否されました。 |
-| `scopes_not_granted` | 同意画面で一部の権限のチェックが外されました。4つすべてを許可して再認証します。 |
+| `scopes_not_granted` | 必要な権限の一部が許可されませんでした。`missing_scopes`に不足分、`extra_scopes`に要求外の許可が表示されます。同意画面で4つすべてにチェックを入れて再認証します。要求外の権限が追加で返っても、必要な4つがそろっていれば成功扱いです。 |
 | `refresh_token_missing` | 更新トークンが発行されませんでした。再認証します。 |
 | `authorization_incomplete` | 5分以内に完了しなかったか、ブラウザー側で中断されました。再実行します。 |
 | `stored_credentials_invalid` / `token_rejected` | 保存済み認証が壊れているか取り消されました。再認証します。Externalのテスト用アプリの更新トークンは7日で失効します。 |

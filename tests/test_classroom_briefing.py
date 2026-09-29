@@ -214,8 +214,7 @@ class AuthorizeTests(unittest.TestCase):
 
     def test_consent_outcomes_map_to_reasons(self):
         from oauthlib.oauth2.rfc6749.errors import AccessDeniedError
-        cases = [(AccessDeniedError(), "consent_denied"), (Warning("Scope has changed"), "scopes_not_granted"),
-                 (AttributeError(), "authorization_incomplete")]
+        cases = [(AccessDeniedError(), "consent_denied"), (AttributeError(), "authorization_incomplete")]
         for exc, expected in cases:
             with self.subTest(expected), patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow:
                 flow.return_value.run_local_server.side_effect = exc
@@ -228,6 +227,39 @@ class AuthorizeTests(unittest.TestCase):
                 flow.return_value.run_local_server.return_value = credentials
                 self.assertEqual(expected, self.reason(self.installed()))
                 vault.assert_not_called()
+
+    def test_missing_scopes_are_named(self):
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        credentials = SimpleNamespace(granted_scopes=SCOPES[:3] + ["openid"], scopes=None, refresh_token="r")
+        with patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                self.assertRaises(ClassroomError) as ctx:
+            flow.return_value.run_local_server.return_value = credentials
+            authorize(self.path)
+        self.assertEqual({"missing_scopes": ["classroom.courseworkmaterials.readonly"], "extra_scopes": ["openid"]},
+                         ctx.exception.details)
+
+    def test_extra_granted_scopes_are_accepted_and_scope_check_is_restored(self):
+        import os
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        seen = {}
+
+        def run_local_server(**kwargs):
+            seen["relax"] = os.environ.get("OAUTHLIB_RELAX_TOKEN_SCOPE")
+            return SimpleNamespace(granted_scopes=SCOPES + ["openid"], scopes=None, refresh_token="r",
+                                   client_id="id", client_secret="s")
+
+        with patch.dict(os.environ, {}, clear=False), \
+                patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                patch("loilo_briefing.classroom.auth._vault") as vault:
+            os.environ.pop("OAUTHLIB_RELAX_TOKEN_SCOPE", None)
+            flow.return_value.run_local_server.side_effect = run_local_server
+            authorize(self.path)
+            self.assertNotIn("OAUTHLIB_RELAX_TOKEN_SCOPE", os.environ)
+        self.assertEqual("1", seen["relax"])
+        stored = json.loads(vault.return_value.set_password.call_args.args[2])
+        self.assertEqual(SCOPES, stored["credentials"]["scopes"])
 
 
 class ParserTests(unittest.TestCase):
