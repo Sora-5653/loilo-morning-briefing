@@ -20,6 +20,25 @@ Google Classroom公式APIから、本人が生徒として参加している開�
 
 必要な権限はclassroom.courses.readonly、classroom.coursework.me.readonly、classroom.announcements.readonly、classroom.courseworkmaterials.readonlyの4つです。
 
+認証スクリプトは、仮想環境がなければ先に`install-classroom.ps1`を実行し、認証後にそのまま収集を1回実行して読取できることを確認します。確認を省く場合は`-SkipVerify`を指定します。クライアントJSONがリポジトリ内にある場合は、誤ってコミットしないよう処理を中止します。
+
+### 失敗時の`reason`
+
+失敗時のJSONには、原因を示す固定の`reason`コードが付きます。APIの応答、URL、トークンは出力しません。
+
+| reason | 意味と対処 |
+| --- | --- |
+| `not_signed_in` | 未認証です。上記の認証スクリプトを実行します。 |
+| `client_secret_unreadable` | クライアントJSONを読めないか、IDまたはシークレットが空です。ダウンロードし直します。 |
+| `client_not_desktop` | 「ウェブ アプリケーション」などのクライアントです。種類「デスクトップ アプリ」で作り直します。 |
+| `client_endpoint_unexpected` | Google以外の認証先が書かれています。Google Cloudから取得し直します。 |
+| `consent_denied` | 同意画面で拒否されたか、テストユーザー未登録・学校のアプリ制限で拒否されました。 |
+| `scopes_not_granted` | 同意画面で一部の権限のチェックが外されました。4つすべてを許可して再認証します。 |
+| `refresh_token_missing` | 更新トークンが発行されませんでした。再認証します。 |
+| `authorization_incomplete` | 5分以内に完了しなかったか、ブラウザー側で中断されました。再実行します。 |
+| `stored_credentials_invalid` / `token_rejected` | 保存済み認証が壊れているか取り消されました。再認証します。Externalのテスト用アプリの更新トークンは7日で失効します。 |
+| `permission_denied` | API応答が403です。Google CloudでClassroom APIが無効か、学校の管理者がアクセスを制限しています。 |
+
 ## 収集と読取
 
 ```powershell
