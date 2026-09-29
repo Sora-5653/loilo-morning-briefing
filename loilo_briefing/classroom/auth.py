@@ -13,7 +13,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/classroom.announcements.readonly",
     "https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly",
 ]
-VAULT_SERVICE = "Codex:DailyBrief:GoogleClassroom"
+# Google reports some grants under their legacy alias; each is the same permission.
+SCOPE_ALIASES = {
+    "https://www.googleapis.com/auth/classroom.coursework.me.readonly":
+        "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly",
+}
+VAULT_SERVICE ="Codex:DailyBrief:GoogleClassroom"
 VAULT_USER = "oauth"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 
@@ -82,12 +87,14 @@ def authorize(client_path: Path) -> None:
     granted = credentials.granted_scopes or credentials.scopes or []
     if isinstance(granted, str):
         granted = granted.split()
-    missing = set(SCOPES) - set(granted)
+    granted = set(granted)
+    missing = {scope for scope in SCOPES if scope not in granted and SCOPE_ALIASES.get(scope) not in granted}
     if missing:
         # Scope names are public identifiers, safe to show for diagnosis.
+        known = set(SCOPES) | set(SCOPE_ALIASES.values())
         raise AuthenticationRequired("Classroom read permissions were not granted", reason="scopes_not_granted",
                                      details={"missing_scopes": _short(missing),
-                                              "extra_scopes": _short(set(granted) - set(SCOPES))})
+                                              "extra_scopes": _short(granted - known)})
     if not credentials.refresh_token:
         raise AuthenticationRequired("Classroom refresh token was not issued", reason="refresh_token_missing")
     try:

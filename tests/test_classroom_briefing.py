@@ -239,6 +239,19 @@ class AuthorizeTests(unittest.TestCase):
         self.assertEqual({"missing_scopes": ["classroom.courseworkmaterials.readonly"], "extra_scopes": ["openid"]},
                          ctx.exception.details)
 
+    def test_legacy_alias_satisfies_coursework_scope(self):
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        # Real Google response: coursework.me.readonly comes back as its legacy alias.
+        granted = [s for s in SCOPES if "coursework.me" not in s] + [
+            "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly"]
+        credentials = SimpleNamespace(granted_scopes=granted, scopes=None, refresh_token="r", client_id="id", client_secret="s")
+        with patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                patch("loilo_briefing.classroom.auth._vault") as vault:
+            flow.return_value.run_local_server.return_value = credentials
+            authorize(self.path)
+        vault.return_value.set_password.assert_called_once()
+
     def test_extra_granted_scopes_are_accepted_and_scope_check_is_restored(self):
         import os
         from loilo_briefing.classroom.auth import authorize
