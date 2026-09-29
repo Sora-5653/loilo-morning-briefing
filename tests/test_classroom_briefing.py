@@ -18,7 +18,7 @@ from loilo_briefing.classroom.auth import SCOPES
 from loilo_briefing.classroom.cache import ClassroomCache
 from loilo_briefing.classroom.client import ClassroomClient
 from loilo_briefing.classroom.collector import ClassroomCollector
-from loilo_briefing.classroom.errors import AuthenticationRequired, RequestFailed, SchemaError
+from loilo_briefing.classroom.errors import AuthenticationRequired, ClassroomError, RequestFailed, SchemaError
 
 
 def item(item_id="w1", **fields):
@@ -176,6 +176,113 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertNotIn("secret", output.getvalue())
         self.assertEqual(before, self.cache.path.read_bytes())
+
+    def test_cli_reports_fixed_reason_code_only(self):
+        error = RequestFailed("https://classroom.googleapis.com/?access_token=secret", reason="permission_denied")
+        with patch("loilo_briefing.classroom.__main__.ClassroomClient.connect", side_effect=error), patch("sys.stdout", new_callable=io.StringIO) as output:
+            code = main(["collect", "--cache-dir", self.temp.name])
+        self.assertEqual(1, code)
+        self.assertEqual("permission_denied", json.loads(output.getvalue())["reason"])
+        self.assertNotIn("secret", output.getvalue())
+
+
+@unittest.skipUnless(importlib.util.find_spec("google_auth_oauthlib"), "Install the classroom extra for OAuth verification")
+class AuthorizeTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name) / "client.json"
+
+    def reason(self, config=None, raw=None):
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(raw if raw is not None else json.dumps(config), encoding="utf-8")
+        with self.assertRaises(ClassroomError) as ctx:
+            authorize(self.path)
+        return ctx.exception.reason
+
+    def installed(self, **overrides):
+        return {"installed": {"client_id": "id", "client_secret": "s", "token_uri": "https://oauth2.googleapis.com/token",
+                              "auth_uri": "https://accounts.google.com/o/oauth2/auth", **overrides}}
+
+    def test_client_file_is_validated_before_opening_browser(self):
+        with patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow:
+            self.assertEqual("client_secret_unreadable", self.reason(raw="{"))
+            self.assertEqual("client_not_desktop", self.reason({"web": self.installed()["installed"]}))
+            self.assertEqual("client_endpoint_unexpected", self.reason(self.installed(token_uri="https://evil.example/token")))
+            self.assertEqual("client_secret_unreadable", self.reason(self.installed(client_secret="")))
+        flow.assert_not_called()
+
+    def test_consent_outcomes_map_to_reasons(self):
+        from oauthlib.oauth2.rfc6749.errors import AccessDeniedError
+        cases = [(AccessDeniedError(), "consent_denied"), (AttributeError(), "authorization_incomplete")]
+        for exc, expected in cases:
+            with self.subTest(expected), patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow:
+                flow.return_value.run_local_server.side_effect = exc
+                self.assertEqual(expected, self.reason(self.installed()))
+        partial = SimpleNamespace(granted_scopes=SCOPES[:1], scopes=None, refresh_token="r")
+        no_refresh = SimpleNamespace(granted_scopes=SCOPES, scopes=None, refresh_token=None)
+        for credentials, expected in [(partial, "scopes_not_granted"), (no_refresh, "refresh_token_missing")]:
+            with self.subTest(expected), patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                    patch("loilo_briefing.classroom.auth._vault") as vault:
+                flow.return_value.run_local_server.return_value = credentials
+                self.assertEqual(expected, self.reason(self.installed()))
+                vault.assert_not_called()
+
+    def test_missing_scopes_are_named(self):
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        credentials = SimpleNamespace(granted_scopes=SCOPES[:3] + ["openid"], scopes=None, refresh_token="r")
+        with patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                self.assertRaises(ClassroomError) as ctx:
+            flow.return_value.run_local_server.return_value = credentials
+            authorize(self.path)
+        self.assertEqual({"missing_scopes": ["classroom.courseworkmaterials.readonly"], "extra_scopes": ["openid"]},
+                         ctx.exception.details)
+
+    def test_legacy_alias_satisfies_coursework_scope(self):
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        # Real Google response: coursework.me.readonly comes back as its legacy alias.
+        granted = [s for s in SCOPES if "coursework.me" not in s] + [
+            "https://www.googleapis.com/auth/classroom.student-submissions.me.readonly"]
+        credentials = SimpleNamespace(granted_scopes=granted, scopes=None, refresh_token="r", client_id="id", client_secret="s")
+        with patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                patch("loilo_briefing.classroom.auth._vault") as vault:
+            flow.return_value.run_local_server.return_value = credentials
+            authorize(self.path)
+        vault.return_value.set_password.assert_called_once()
+
+    def test_alias_only_refresh_warning_is_silenced(self):
+        import logging
+        logger = logging.getLogger("google.oauth2.credentials")
+        prefix = "Not all requested scopes were granted by the authorization server, missing scopes "
+        with self.assertLogs(logger, "WARNING") as logs:
+            logger.warning(prefix + "https://www.googleapis.com/auth/classroom.coursework.me.readonly.")
+            logger.warning(prefix + "https://www.googleapis.com/auth/classroom.announcements.readonly.")
+        self.assertEqual(1, len(logs.records))
+        self.assertIn("announcements", logs.records[0].getMessage())
+
+    def test_extra_granted_scopes_are_accepted_and_scope_check_is_restored(self):
+        import os
+        from loilo_briefing.classroom.auth import authorize
+        self.path.write_text(json.dumps(self.installed()), encoding="utf-8")
+        seen = {}
+
+        def run_local_server(**kwargs):
+            seen["relax"] = os.environ.get("OAUTHLIB_RELAX_TOKEN_SCOPE")
+            return SimpleNamespace(granted_scopes=SCOPES + ["openid"], scopes=None, refresh_token="r",
+                                   client_id="id", client_secret="s")
+
+        with patch.dict(os.environ, {}, clear=False), \
+                patch("google_auth_oauthlib.flow.InstalledAppFlow.from_client_config") as flow, \
+                patch("loilo_briefing.classroom.auth._vault") as vault:
+            os.environ.pop("OAUTHLIB_RELAX_TOKEN_SCOPE", None)
+            flow.return_value.run_local_server.side_effect = run_local_server
+            authorize(self.path)
+            self.assertNotIn("OAUTHLIB_RELAX_TOKEN_SCOPE", os.environ)
+        self.assertEqual("1", seen["relax"])
+        stored = json.loads(vault.return_value.set_password.call_args.args[2])
+        self.assertEqual(SCOPES, stored["credentials"]["scopes"])
 
 
 class ParserTests(unittest.TestCase):

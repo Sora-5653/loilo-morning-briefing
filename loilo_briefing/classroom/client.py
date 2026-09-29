@@ -44,7 +44,10 @@ class ClassroomClient:
                 # Never let OAuth tokens or the requested URL reach stdout/logs.
                 status = getattr(getattr(exc, "resp", None), "status", None)
                 if status == 401 or type(exc).__name__ == "RefreshError":
-                    raise AuthenticationRequired("Classroom sign-in is required") from exc
+                    raise AuthenticationRequired("Classroom sign-in is required", reason="token_rejected") from exc
+                if status == 403:
+                    # API disabled in the Cloud project, or blocked by the school admin.
+                    raise RequestFailed("Classroom GET request was forbidden", reason="permission_denied") from exc
                 raise RequestFailed("Classroom GET request failed") from exc
             if (not isinstance(result, dict) or not isinstance(result.get(key, []), list)
                     or not set(result).issubset({key, "nextPageToken"})):

@@ -40,7 +40,11 @@ def main(argv=None):
         if args.command == "collect":
             cache.failure(error)
         status = "authentication_required" if isinstance(error, AuthenticationRequired) else "setup_required" if isinstance(error, SetupRequired) else "failed"
-        _print({"source": "classroom", "status": status, "error": type(error).__name__, "cache_preserved": cache.path.exists()})
+        report = {"source": "classroom", "status": status, "error": type(error).__name__, "cache_preserved": cache.path.exists()}
+        if error.reason:
+            report["reason"] = error.reason
+        report.update(error.details)
+        _print(report)
         return 2 if isinstance(error, (AuthenticationRequired, SetupRequired)) else 1
 
 

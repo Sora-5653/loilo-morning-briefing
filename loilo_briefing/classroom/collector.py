@@ -83,7 +83,10 @@ class ClassroomCollector:
                     fetched_at = now
                 except ClassroomError as exc:
                     result[component].extend(deepcopy(previous))
-                    result["errors"].append({"course_id": course_id, "component": component, "error": type(exc).__name__})
+                    error = {"course_id": course_id, "component": component, "error": type(exc).__name__}
+                    if exc.reason:
+                        error["reason"] = exc.reason
+                    result["errors"].append(error)
                     status = "failed"
                     fetched_at = prior_status.get("last_successful_fetch_at")
                 result["course_status"].append({"course_id": course_id, "course": course["course"],
