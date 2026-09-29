@@ -5,7 +5,7 @@ Google Classroom公式APIから、本人が生徒として参加している開�
 ## 初回認証
 
 1. [Google公式の設定手順](https://developers.google.com/workspace/classroom/quickstart/python#set_up_your_environment)に従って、Google CloudプロジェクトでClassroom APIを有効にします。
-2. OAuth同意画面を設定し、種類が「デスクトップ アプリ」のOAuthクライアントを作成します。Google Auth Platformの「対象」で公開ステータスを本番環境にします。サポートメールには自分のアドレス、ホームページには実在するページ（例: このリポジトリ）を指定します。個人利用なら審査は不要で、未確認アプリの警告が出るだけです。テスト状態のままでも、利用するClassroomアカウントをテストユーザーに追加すれば認証できますが、更新トークンが7日で失効します。
+2. OAuth同意画面を設定し、種類が「デスクトップ アプリ」のOAuthクライアントを作成します。Externalのテスト用アプリなら、利用するClassroomアカウントをテストユーザーに追加します。
 3. クライアントJSONをダウンロードし、リポジトリ外に保存します。JSONの内容やパスワードをチャットへ貼る必要はありません。
 4. 初回だけ、PowerShellで次を実行します。
 
@@ -36,7 +36,7 @@ Google Classroom公式APIから、本人が生徒として参加している開�
 | `scopes_not_granted` | 必要な権限の一部が許可されませんでした。`missing_scopes`に不足分、`extra_scopes`に要求外の許可が表示されます。同意画面で4つすべてにチェックを入れて再認証します。要求外の権限が追加で返っても、必要な4つがそろっていれば成功扱いです。 |
 | `refresh_token_missing` | 更新トークンが発行されませんでした。再認証します。 |
 | `authorization_incomplete` | 5分以内に完了しなかったか、ブラウザー側で中断されました。再実行します。 |
-| `stored_credentials_invalid` / `token_rejected` | 保存済み認証が壊れているか取り消されました。再認証します。テスト状態のアプリの更新トークンは7日で失効します。テスト中に認証した後で本番公開した場合も、公開後に一度再認証します。 |
+| `stored_credentials_invalid` / `token_rejected` | 保存済み認証が壊れているか取り消されました。再認証します。Externalのテスト用アプリの更新トークンは7日で失効します。 |
 | `permission_denied` | API応答が403です。Google CloudでClassroom APIが無効か、学校の管理者がアクセスを制限しています。 |
 
 ## 収集と読取
