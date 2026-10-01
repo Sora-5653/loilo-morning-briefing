@@ -38,6 +38,7 @@ Google Classroom公式APIから、本人が生徒として参加している開�
 | `authorization_incomplete` | 5分以内に完了しなかったか、ブラウザー側で中断されました。再実行します。 |
 | `stored_credentials_invalid` / `token_rejected` | 保存済み認証が壊れているか取り消されました。再認証します。テスト状態のアプリの更新トークンは7日で失効します。テスト中に認証した後で本番公開した場合も、公開後に一度再認証します。 |
 | `permission_denied` | API応答が403です。Google CloudでClassroom APIが無効か、学校の管理者がアクセスを制限しています。 |
+| `python_unavailable` / `python_start_failed` | Pythonを起動できませんでした。READMEの「Codexの自動実行」を参照してください。 |
 
 ## 収集と読取
 
