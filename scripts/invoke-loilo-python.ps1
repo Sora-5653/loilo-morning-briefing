@@ -1,9 +1,13 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string[]]$PythonArgs
+    [string[]]$PythonArgs,
+    # Source name for the fallback JSON when no usable Python is found.
+    [string]$Source = 'loilonote'
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'briefing-common.ps1')
+
 $candidates = @()
 if (Get-Command py -ErrorAction SilentlyContinue) {
     $candidates += @{ Command = 'py'; Prefix = @('-3') }
@@ -23,17 +27,12 @@ foreach ($command in @('python', 'python3')) {
 
 foreach ($candidate in $candidates) {
     $prefixArgs = $candidate.Prefix
-    try {
-        & $candidate.Command @prefixArgs -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' *> $null
-        $usable = $LASTEXITCODE -eq 0
-    }
-    catch {
-        $usable = $false
-    }
-    if ($usable) {
+    if (Test-PythonUsable -Command $candidate.Command -Prefix $prefixArgs) {
         & $candidate.Command @prefixArgs -X utf8 @PythonArgs
         exit $LASTEXITCODE
     }
 }
 
-throw 'Python 3.11 or newer is required for the LoiLoNote collector.'
+[Console]::Error.WriteLine('Python 3.11 or newer is required for the morning briefing collectors.')
+Write-SourceUnavailable -Source $Source -Reason 'python_unavailable'
+exit 2

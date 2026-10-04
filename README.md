@@ -84,6 +84,25 @@ py -3 -m loilo_briefing auth clear
 
 `collect` は、成功または部分成功で0、認証が必要な場合は2、その他の全体失敗は1を返します。失敗しても既存の正常なキャッシュは上書きしません。
 
+Python 3.11以上が見つからない、またはClassroom用の仮想環境のPythonが起動できない場合も、収集・入力読取スクリプトは標準出力へJSONを1行返し、終了コード2で終了します。
+
+| reason | 意味 |
+| --- | --- |
+| `python_unavailable` | 実行ユーザーから使えるPython 3.11以上が見つかりません。 |
+| `python_start_failed` | `.venv-classroom`のPythonが起動できません。`python_exit`の101は、仮想環境が元のPythonを起動できなかったことを示します。 |
+
+`sandboxed: true`が付く場合は、Codexのサンドボックス用ユーザーで実行されています。
+
+## Codexの自動実行
+
+朝の定期実行は、認証を設定したWindowsユーザー本人の権限で、サンドボックスなしで実行してください。Codexの`elevated`サンドボックスは、コマンドを別のローカルユーザー（`CodexSandbox*`）として実行します。そのユーザーからは、次のものが使えません。
+
+- 利用者のプロフィール内にあるPython（`%LOCALAPPDATA%\Python`やWindowsAppsのアプリ実行エイリアス）
+- Windows資格情報マネージャーに保存したLoiLoNoteのセッションとClassroomの認証（ユーザーごとに分かれています）
+- `%LOCALAPPDATA%`のキャッシュ
+
+そのため、Pythonの場所を変えるだけでは解決しません。
+
 ## 試験
 
 外部パッケージなしで実行できます。
